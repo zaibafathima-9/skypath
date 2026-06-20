@@ -13,11 +13,20 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class FlightSearchService {
+
+    private static final int MAX_SEGMENTS = 3;
+
+    private static final long MIN_DOMESTIC_LAYOVER_MINUTES = 45;
+    private static final long MIN_INTERNATIONAL_LAYOVER_MINUTES = 90;
+    private static final long MAX_LAYOVER_MINUTES = 6 * 60;
 
     private final FlightDataService flightDataService;
 
@@ -25,12 +34,26 @@ public class FlightSearchService {
         this.flightDataService = flightDataService;
     }
 
-    public SearchResponse searchDirectFlights(String origin, String destination, LocalDate date) {
-        List<ItineraryDto> itineraries = flightDataService.getFlightsFromOrigin(origin)
+    public SearchResponse searchFlights(String origin, String destination, LocalDate date) {
+        List<ItineraryDto> itineraries = new ArrayList<>();
+
+        List<Flight> startingFlights = flightDataService.getFlightsFromOrigin(origin)
                 .stream()
-                .filter(flight -> flight.destination().equalsIgnoreCase(destination))
                 .filter(flight -> isDepartureOnRequestedDate(flight, date))
-                .map(this::buildDirectItinerary)
+                .toList();
+
+        for (Flight flight : startingFlights) {
+            List<Flight> currentPath = new ArrayList<>();
+            Set<String> visitedAirports = new HashSet<>();
+
+            currentPath.add(flight);
+            visitedAirports.add(origin);
+            visitedAirports.add(flight.destination());
+
+
+        }
+
+        List<ItineraryDto> sortedItineraries = itineraries.stream()
                 .sorted(Comparator.comparingLong(ItineraryDto::totalDurationMinutes))
                 .toList();
 
@@ -38,15 +61,77 @@ public class FlightSearchService {
                 origin,
                 destination,
                 date.toString(),
-                itineraries.size(),
-                itineraries
+                sortedItineraries.size(),
+                sortedItineraries
         );
     }
 
-    private ItineraryDto buildDirectItinerary(Flight flight) {
-        long durationMinutes = calculateFlightDurationMinutes(flight);
+    private boolean isValidConnection(Flight arrivingFlight, Flight departingFlight) {
+        Duration layover = Duration.between(
+                getArrivalInstant(arrivingFlight),
+                getDepartureInstant(departingFlight)
+        );
 
-        FlightSegmentDto segment = new FlightSegmentDto(
+        if (layover.isNegative() || layover.isZero()) {
+            return false;
+        }
+
+        long layoverMinutes = layover.toMinutes();
+
+        long minimumLayoverMinutes = isDomesticConnection(arrivingFlight, departingFlight)
+                ? MIN_DOMESTIC_LAYOVER_MINUTES
+                : MIN_INTERNATIONAL_LAYOVER_MINUTES;
+
+        return layoverMinutes >= minimumLayoverMinutes
+                && layoverMinutes <= MAX_LAYOVER_MINUTES;
+    }
+
+    private boolean isDomesticConnection(Flight arrivingFlight, Flight departingFlight) {
+        String arrivingOriginCountry = getAirportCountry(arrivingFlight.origin());
+        String arrivingDestinationCountry = getAirportCountry(arrivingFlight.destination());
+        String departingOriginCountry = getAirportCountry(departingFlight.origin());
+        String departingDestinationCountry = getAirportCountry(departingFlight.destination());
+
+        return arrivingOriginCountry.equals(arrivingDestinationCountry)
+                && arrivingOriginCountry.equals(departingOriginCountry)
+                && arrivingOriginCountry.equals(departingDestinationCountry);
+    }
+
+    private String getAirportCountry(String airportCode) {
+        return flightDataService.getAirportByCode(airportCode)
+                .orElseThrow(() -> new IllegalStateException("Airport not found: " + airportCode))
+                .country();
+    }
+
+    private ItineraryDto buildItinerary(List<Flight> flights) {
+        List<FlightSegmentDto> segments = flights.stream()
+                .map(this::buildSegment)
+                .toList();
+
+        Instant firstDeparture = getDepartureInstant(flights.get(0));
+        Instant finalArrival = getArrivalInstant(flights.get(flights.size() - 1));
+
+        long totalDurationMinutes = Duration
+                .between(firstDeparture, finalArrival)
+                .toMinutes();
+
+        BigDecimal totalPrice = flights.stream()
+                .map(flight -> flight.price() == null ? BigDecimal.ZERO : flight.price())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new ItineraryDto(
+                segments,
+                totalDurationMinutes,
+                totalPrice
+        );
+    }
+
+    private FlightSegmentDto buildSegment(Flight flight) {
+        long durationMinutes = Duration
+                .between(getDepartureInstant(flight), getArrivalInstant(flight))
+                .toMinutes();
+
+        return new FlightSegmentDto(
                 flight.flightNumber(),
                 flight.airline(),
                 flight.origin(),
@@ -56,12 +141,6 @@ public class FlightSearchService {
                 flight.price(),
                 flight.aircraft(),
                 durationMinutes
-        );
-
-        return new ItineraryDto(
-                List.of(segment),
-                durationMinutes,
-                flight.price() == null ? BigDecimal.ZERO : flight.price()
         );
     }
 
@@ -73,18 +152,12 @@ public class FlightSearchService {
         return departureDate.equals(requestedDate);
     }
 
-    private long calculateFlightDurationMinutes(Flight flight) {
-        Instant departureInstant = toInstant(
-                flight.departureTime(),
-                flight.origin()
-        );
+    private Instant getDepartureInstant(Flight flight) {
+        return toInstant(flight.departureTime(), flight.origin());
+    }
 
-        Instant arrivalInstant = toInstant(
-                flight.arrivalTime(),
-                flight.destination()
-        );
-
-        return Duration.between(departureInstant, arrivalInstant).toMinutes();
+    private Instant getArrivalInstant(Flight flight) {
+        return toInstant(flight.arrivalTime(), flight.destination());
     }
 
     private Instant toInstant(String localDateTime, String airportCode) {
@@ -96,4 +169,48 @@ public class FlightSearchService {
                 .atZone(ZoneId.of(airport.timezone()))
                 .toInstant();
     }
+
+    private void searchConnections(
+            Flight currentFlight,
+            String finalDestination,
+            List<Flight> currentPath,
+            Set<String> visitedAirports,
+            List<ItineraryDto> results
+    ) {
+        if (currentFlight.destination().equalsIgnoreCase(finalDestination)) {
+            results.add(buildItinerary(currentPath));
+            return;
+        }
+
+        if (currentPath.size() >= MAX_SEGMENTS) {
+            return;
+        }
+
+        List<Flight> nextFlights = flightDataService.getFlightsFromOrigin(currentFlight.destination());
+
+        for (Flight nextFlight : nextFlights) {
+            if (visitedAirports.contains(nextFlight.destination())) {
+                continue;
+            }
+
+            if (!isValidConnection(currentFlight, nextFlight)) {
+                continue;
+            }
+
+            currentPath.add(nextFlight);
+            visitedAirports.add(nextFlight.destination());
+
+            searchConnections(
+                    nextFlight,
+                    finalDestination,
+                    currentPath,
+                    visitedAirports,
+                    results
+            );
+
+            currentPath.remove(currentPath.size() - 1);
+            visitedAirports.remove(nextFlight.destination());
+        }
+    }
+
 }

@@ -40,7 +40,7 @@ public class SearchController {
         validateAirportExists(normalizedOrigin, "origin");
         validateAirportExists(normalizedDestination, "destination");
 
-        SearchResponse response = flightSearchService.searchDirectFlights(
+        SearchResponse response = flightSearchService.searchFlights(
                 normalizedOrigin,
                 normalizedDestination,
                 parsedDate
