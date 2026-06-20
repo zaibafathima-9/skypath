@@ -17,4 +17,7 @@ public record Flight (
 )
 
 {
+    public String aircraft() {
+        return "";
+    }
 }
