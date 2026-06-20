@@ -27,6 +27,7 @@ public class FlightSearchService {
     private static final long MIN_DOMESTIC_LAYOVER_MINUTES = 45;
     private static final long MIN_INTERNATIONAL_LAYOVER_MINUTES = 90;
     private static final long MAX_LAYOVER_MINUTES = 6 * 60;
+    private static final int MAX_RESULTS = 100;
 
     private final FlightDataService flightDataService;
 
@@ -50,11 +51,18 @@ public class FlightSearchService {
             visitedAirports.add(origin);
             visitedAirports.add(flight.destination());
 
-
+            searchConnections(
+                    flight,
+                    destination,
+                    currentPath,
+                    visitedAirports,
+                    itineraries
+            );
         }
 
         List<ItineraryDto> sortedItineraries = itineraries.stream()
                 .sorted(Comparator.comparingLong(ItineraryDto::totalDurationMinutes))
+                .limit(MAX_RESULTS)
                 .toList();
 
         return new SearchResponse(
@@ -64,6 +72,49 @@ public class FlightSearchService {
                 sortedItineraries.size(),
                 sortedItineraries
         );
+    }
+
+    private void searchConnections(
+            Flight currentFlight,
+            String finalDestination,
+            List<Flight> currentPath,
+            Set<String> visitedAirports,
+            List<ItineraryDto> results
+    ) {
+        if (currentFlight.destination().equalsIgnoreCase(finalDestination)) {
+            results.add(buildItinerary(currentPath));
+            return;
+        }
+
+        if (currentPath.size() >= MAX_SEGMENTS) {
+            return;
+        }
+
+        List<Flight> nextFlights = flightDataService.getFlightsFromOrigin(currentFlight.destination());
+
+        for (Flight nextFlight : nextFlights) {
+            if (visitedAirports.contains(nextFlight.destination())) {
+                continue;
+            }
+
+            if (!isValidConnection(currentFlight, nextFlight)) {
+                continue;
+            }
+
+            currentPath.add(nextFlight);
+            visitedAirports.add(nextFlight.destination());
+
+            searchConnections(
+                    nextFlight,
+                    finalDestination,
+                    currentPath,
+                    visitedAirports,
+                    results
+            );
+
+            currentPath.remove(currentPath.size() - 1);
+            visitedAirports.remove(nextFlight.destination());
+        }
     }
 
     private boolean isValidConnection(Flight arrivingFlight, Flight departingFlight) {
@@ -169,48 +220,4 @@ public class FlightSearchService {
                 .atZone(ZoneId.of(airport.timezone()))
                 .toInstant();
     }
-
-    private void searchConnections(
-            Flight currentFlight,
-            String finalDestination,
-            List<Flight> currentPath,
-            Set<String> visitedAirports,
-            List<ItineraryDto> results
-    ) {
-        if (currentFlight.destination().equalsIgnoreCase(finalDestination)) {
-            results.add(buildItinerary(currentPath));
-            return;
-        }
-
-        if (currentPath.size() >= MAX_SEGMENTS) {
-            return;
-        }
-
-        List<Flight> nextFlights = flightDataService.getFlightsFromOrigin(currentFlight.destination());
-
-        for (Flight nextFlight : nextFlights) {
-            if (visitedAirports.contains(nextFlight.destination())) {
-                continue;
-            }
-
-            if (!isValidConnection(currentFlight, nextFlight)) {
-                continue;
-            }
-
-            currentPath.add(nextFlight);
-            visitedAirports.add(nextFlight.destination());
-
-            searchConnections(
-                    nextFlight,
-                    finalDestination,
-                    currentPath,
-                    visitedAirports,
-                    results
-            );
-
-            currentPath.remove(currentPath.size() - 1);
-            visitedAirports.remove(nextFlight.destination());
-        }
-    }
-
 }

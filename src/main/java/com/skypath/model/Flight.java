@@ -13,11 +13,8 @@ public record Flight (
         String departureTime,
         String arrivalTime,
         BigDecimal price,
-        String artifact
+        String aircraft
 )
 
 {
-    public String aircraft() {
-        return "";
-    }
 }
