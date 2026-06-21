@@ -1,6 +1,6 @@
 package com.skypath.service;
 
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.skypath.model.Airport;
 import com.skypath.model.Flight;
 import com.skypath.model.FlightDataset;
