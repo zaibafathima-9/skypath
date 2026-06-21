@@ -1,6 +1,7 @@
 package com.skypath.service;
 
 import com.skypath.dto.FlightSegmentDto;
+import com.skypath.dto.LayoverDto;
 import com.skypath.dto.ItineraryDto;
 import com.skypath.dto.SearchResponse;
 import com.skypath.model.Airport;
@@ -159,6 +160,8 @@ public class FlightSearchService {
                 .map(this::buildSegment)
                 .toList();
 
+        List<LayoverDto> layovers = buildLayovers(flights);
+
         Instant firstDeparture = getDepartureInstant(flights.get(0));
         Instant finalArrival = getArrivalInstant(flights.get(flights.size() - 1));
 
@@ -172,10 +175,38 @@ public class FlightSearchService {
 
         return new ItineraryDto(
                 segments,
+                layovers,
                 totalDurationMinutes,
                 totalPrice
         );
     }
+
+    private List<LayoverDto> buildLayovers(List<Flight> flights) {
+        List<LayoverDto> layovers = new ArrayList<>();
+
+        for (int i = 0; i < flights.size() - 1; i++) {
+            Flight arrivingFlight = flights.get(i);
+            Flight departingFlight = flights.get(i + 1);
+
+            long layoverMinutes = Duration.between(
+                    getArrivalInstant(arrivingFlight),
+                    getDepartureInstant(departingFlight)
+            ).toMinutes();
+
+            String connectionType = isDomesticConnection(arrivingFlight, departingFlight)
+                    ? "domestic"
+                    : "international";
+
+            layovers.add(new LayoverDto(
+                    arrivingFlight.destination(),
+                    layoverMinutes,
+                    connectionType
+            ));
+        }
+
+        return layovers;
+    }
+
 
     private FlightSegmentDto buildSegment(Flight flight) {
         long durationMinutes = Duration

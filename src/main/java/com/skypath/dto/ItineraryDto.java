@@ -5,6 +5,7 @@ import java.util.List;
 
 public record ItineraryDto(
         List<FlightSegmentDto> segments,
+        List<LayoverDto> layovers,
         long totalDurationMinutes,
         BigDecimal totalPrice
 ) {
