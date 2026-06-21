@@ -1,0 +1,107 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f6f8fb;
+  color: #172033;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+.hero {
+  margin-bottom: 28px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: #3157d5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0 0 10px;
+  font-size: 40px;
+}
+
+.hero p {
+  max-width: 680px;
+  line-height: 1.6;
+  color: #586174;
+}
+
+.search-form {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #dde3ee;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(23, 32, 51, 0.08);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.field input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #c8d1e0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.field-error {
+  margin: 0;
+  color: #b3261e;
+  font-size: 13px;
+}
+
+.search-form button {
+  height: 44px;
+  margin-top: 22px;
+  border: none;
+  border-radius: 10px;
+  background: #3157d5;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.search-form button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 800px) {
+  .search-form {
+    grid-template-columns: 1fr;
+  }
+
+  .search-form button {
+    margin-top: 0;
+  }
+}
