@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { searchFlights } from "./api/searchApi";
 import { SearchForm } from "./components/SearchForm";
+import type { SearchResponse } from "./types/flight";
 import type { SearchFormErrors, SearchFormValues } from "./types/search";
 
 const DEFAULT_FORM: SearchFormValues = {
@@ -41,7 +43,9 @@ function validate(values: SearchFormValues): SearchFormErrors {
 function App() {
   const [formValues, setFormValues] = useState<SearchFormValues>(DEFAULT_FORM);
   const [errors, setErrors] = useState<SearchFormErrors>({});
-  const [isLoading] = useState(false);
+  const [result, setResult] = useState<SearchResponse | null>(null);
+  const [apiError, setApiError] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
 
   function handleChange(field: keyof SearchFormValues, value: string) {
     setFormValues((current) => ({
@@ -53,9 +57,11 @@ function App() {
       ...current,
       [field]: undefined,
     }));
+
+    setApiError("");
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const validationErrors = validate(formValues);
     setErrors(validationErrors);
 
@@ -63,7 +69,20 @@ function App() {
       return;
     }
 
-    console.log("Search submitted", formValues);
+    setIsLoading(true);
+    setApiError("");
+    setResult(null);
+
+    try {
+      const response = await searchFlights(formValues);
+      setResult(response);
+    } catch (error) {
+      setApiError(
+          error instanceof Error ? error.message : "Unable to search flights."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -72,8 +91,8 @@ function App() {
           <p className="eyebrow">SkyPath</p>
           <h1>Find flight connections</h1>
           <p>
-            Search direct, 1-stop, and 2-stop flight itineraries with timezone-aware
-            durations.
+            Search direct, 1-stop, and 2-stop flight itineraries with
+            timezone-aware durations.
           </p>
         </section>
 
@@ -84,6 +103,18 @@ function App() {
             onChange={handleChange}
             onSubmit={handleSubmit}
         />
+
+        {apiError && <div className="alert error">{apiError}</div>}
+
+        {result && (
+            <section className="results-summary">
+              <h2>
+                {result.count} itineraries from {result.origin} to{" "}
+                {result.destination}
+              </h2>
+              <p>Date: {result.date}</p>
+            </section>
+        )}
       </main>
   );
 }

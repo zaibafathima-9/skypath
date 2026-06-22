@@ -105,3 +105,33 @@ input {
     margin-top: 0;
   }
 }
+
+.alert {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.alert.error {
+  color: #8c1d18;
+  background: #fceeee;
+  border: 1px solid #f3c6c2;
+}
+
+.results-summary {
+  margin-top: 24px;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #dde3ee;
+  border-radius: 16px;
+}
+
+.results-summary h2 {
+  margin: 0 0 8px;
+}
+
+.results-summary p {
+  margin: 0;
+  color: #586174;
+}
